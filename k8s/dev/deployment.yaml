@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  namespace: dev
+  labels:
+    app: appointment-service
+    env: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+        env: dev
+    spec:
+      containers:
+        - name: appointment-service
+          image: PLACEHOLDER  # Replaced by pipeline at deploy time
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
