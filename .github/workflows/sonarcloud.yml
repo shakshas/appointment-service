@@ -77,7 +77,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Generate image tags
       - name: Set image tags
         id: tags
         run: |
@@ -111,7 +110,6 @@ jobs:
           severity: CRITICAL,HIGH
 
       # Step 3 - Push to DEV ACR
-      # Tags: latest, short-sha, branch-date-sha
       - name: Log in to DEV ACR
         if: ${{ github.ref == 'refs/heads/main' }}
         uses: docker/login-action@v3
@@ -215,11 +213,17 @@ jobs:
           resource-group: ${{ secrets.DEV_AKS_RESOURCE_GROUP }}
           cluster-name: ${{ secrets.DEV_AKS_CLUSTER_NAME }}
 
+      - name: Create namespace if not exists
+        run: kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Inject image tag into deployment
+        run: |
+          sed -i 's|PLACEHOLDER|${{ secrets.DEV_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }}|g' k8s/dev/deployment.yaml
+
       - name: Deploy to DEV AKS
         run: |
-          kubectl set image deployment/appointment-service \
-            appointment-service=${{ secrets.DEV_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }} \
-            --namespace=dev
+          kubectl apply -f k8s/dev/deployment.yaml
+          kubectl apply -f k8s/dev/service.yaml
           kubectl rollout status deployment/appointment-service --namespace=dev
 
   # ─────────────────────────────────────────
@@ -257,11 +261,17 @@ jobs:
           resource-group: ${{ secrets.STAGING_AKS_RESOURCE_GROUP }}
           cluster-name: ${{ secrets.STAGING_AKS_CLUSTER_NAME }}
 
+      - name: Create namespace if not exists
+        run: kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Inject image tag into deployment
+        run: |
+          sed -i 's|PLACEHOLDER|${{ secrets.STAGING_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }}|g' k8s/staging/deployment.yaml
+
       - name: Deploy to STAGING AKS
         run: |
-          kubectl set image deployment/appointment-service \
-            appointment-service=${{ secrets.STAGING_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }} \
-            --namespace=staging
+          kubectl apply -f k8s/staging/deployment.yaml
+          kubectl apply -f k8s/staging/service.yaml
           kubectl rollout status deployment/appointment-service --namespace=staging
 
   # ─────────────────────────────────────────
@@ -299,9 +309,15 @@ jobs:
           resource-group: ${{ secrets.PROD_AKS_RESOURCE_GROUP }}
           cluster-name: ${{ secrets.PROD_AKS_CLUSTER_NAME }}
 
+      - name: Create namespace if not exists
+        run: kubectl create namespace prod --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Inject image tag into deployment
+        run: |
+          sed -i 's|PLACEHOLDER|${{ secrets.PROD_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }}|g' k8s/prod/deployment.yaml
+
       - name: Deploy to PROD AKS
         run: |
-          kubectl set image deployment/appointment-service \
-            appointment-service=${{ secrets.PROD_ACR_LOGIN_SERVER }}/appointment-service:${{ steps.tags.outputs.image_tag }} \
-            --namespace=prod
+          kubectl apply -f k8s/prod/deployment.yaml
+          kubectl apply -f k8s/prod/service.yaml
           kubectl rollout status deployment/appointment-service --namespace=prod
